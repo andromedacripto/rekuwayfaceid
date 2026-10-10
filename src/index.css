@@ -2,32 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Arc Dark tokens — Rekuway Face ID premium dark theme ─────────────── */
 :root {
-  /* Rekuway Face ID — Arc Dark variant with deep black canvas */
-  --bg: #080c10;
-  --bg-gradient: linear-gradient(180deg, #080c10 0%, #0a1018 60%, #0d1520 100%);
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-strong: rgba(255, 255, 255, 0.09);
-  --surface-muted: #111820;
-  --ink: #f0f4fa;
-  --ink-2: #c8d8ee;
-  --muted: #8fa5be;
-  --subtle: #566879;
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(160, 200, 255, 0.30);
-  --accent: #4fa3e3;
-  --accent-hover: #72bbf0;
-  --accent-dim: rgba(79, 163, 227, 0.15);
-  --success: #4fc38a;
-  --success-dim: rgba(79, 195, 138, 0.12);
-  --danger: #e8526a;
-  --danger-dim: rgba(232, 82, 106, 0.12);
-  --warning: #f0a940;
-  --warning-dim: rgba(240, 169, 64, 0.12);
+  --bg: #050505;
+  --bg-gradient: linear-gradient(160deg, #070710 0%, #05050a 50%, #0a0808 100%);
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-strong: rgba(255, 255, 255, 0.08);
+  --surface-muted: #0f0f14;
+  --ink: #f9faf3;
+  --ink-2: #e3ecf9;
+  --muted: #94a3b8;
+  --subtle: #64748b;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --accent: #ffffff;
+  --accent-hover: rgba(255, 255, 255, 0.85);
+  --success: #4ade80;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --blue: #60a5fa;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
@@ -36,49 +37,61 @@ body {
   min-height: 100dvh;
   background: var(--bg);
   color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ─── Typography helpers ────────────────────────────────────────────────── */
 .display {
   font-family: 'Space Grotesk', sans-serif;
   letter-spacing: -0.03em;
 }
-
 .mono {
   font-family: 'JetBrains Mono', Menlo, monospace;
 }
 
-/* Scrollbar */
+/* ─── Scrollbar ─────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
 
-/* Scan line animation */
-@keyframes scanLine {
-  0% { transform: translateY(-100%); opacity: 0.6; }
-  100% { transform: translateY(100%); opacity: 0; }
+/* ─── Focus ─────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-@keyframes pulse-ring {
-  0% { transform: scale(0.95); opacity: 0.7; }
-  50% { transform: scale(1.05); opacity: 0.4; }
-  100% { transform: scale(0.95); opacity: 0.7; }
+/* ─── Toasts (Sonner) ───────────────────────────────────────────────────── */
+[data-sonner-toast] {
+  background: #111118 !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  color: #f9faf3 !important;
+  font-family: 'DM Sans', sans-serif !important;
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+/* ─── Next.js page transitions ──────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-page { animation: fade-in 0.25s ease; }
+
+/* ─── Glass surface ─────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.animate-scan {
-  animation: scanLine 2s linear infinite;
+/* ─── Scan line animation for face camera loading ────────────────────────── */
+@keyframes scan {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(400%); }
 }
-
-.animate-pulse-ring {
-  animation: pulse-ring 2s ease-in-out infinite;
-}
-
-.skeleton {
-  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-strong) 50%, var(--surface) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+.scan-line {
+  animation: scan 2s linear infinite;
+  background: linear-gradient(to bottom, transparent, rgba(96,165,250,0.4), transparent);
 }

@@ -1,8 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Shield, AlertCircle } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import type { VerificationOutcome } from '@/components/face/FaceVerificationModal'
+
+// Lazy-load the modal so TensorFlow.js doesn't block initial page load
+const FaceVerificationModal = dynamic(() => import('@/components/face/FaceVerificationModal'), {
+  ssr: false,
+})
 
 type Mode = 'login' | 'register'
 
@@ -19,6 +26,11 @@ export default function AuthPage({ mode }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+
+  // Face verification modal state (login only)
+  const [showFaceModal, setShowFaceModal] = useState(false)
+  const [faceRequired, setFaceRequired] = useState(false)
+  const [pendingApiKey, setPendingApiKey] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -45,6 +57,22 @@ export default function AuthPage({ mode }: Props) {
         return
       }
 
+      if (!isRegister) {
+        // Fetch API key for face verification
+        const keysRes = await fetch('/api/dashboard/api-keys')
+        if (keysRes.ok) {
+          const keysData = await keysRes.json()
+          const firstKey = keysData?.keys?.[0]
+          if (firstKey) {
+            setPendingApiKey(firstKey.keyPrefix + '...')
+          }
+        }
+        // Trigger face verification step
+        setFaceRequired(true)
+        setShowFaceModal(true)
+        return
+      }
+
       router.replace('/dashboard')
     } catch {
       setError('Erro de conexão. Verifique sua internet e tente novamente.')
@@ -52,6 +80,22 @@ export default function AuthPage({ mode }: Props) {
       setLoading(false)
     }
   }
+
+  const handleFaceResult = useCallback((outcome: VerificationOutcome) => {
+    setShowFaceModal(false)
+    if (outcome.status === 'VERIFIED' || outcome.status === 'INCONCLUSIVE') {
+      // Allow login (INCONCLUSIVE is recorded as alert but doesn't block)
+      router.replace('/dashboard')
+    } else if (outcome.status === 'REFUSED') {
+      setError('Verificação facial recusada. Acesso negado por segurança.')
+      setFaceRequired(false)
+    }
+  }, [router])
+
+  const skipFace = useCallback(() => {
+    setShowFaceModal(false)
+    router.replace('/dashboard')
+  }, [router])
 
   return (
     <div
@@ -193,6 +237,18 @@ export default function AuthPage({ mode }: Props) {
           </p>
         </div>
       </div>
+
+      {/* Face verification modal — fires after credentials OK */}
+      {faceRequired && (
+        <FaceVerificationModal
+          open={showFaceModal}
+          onClose={skipFace}
+          onResult={handleFaceResult}
+          apiKey={pendingApiKey ?? 'demo'}
+          title="Confirme sua identidade"
+          description="Como etapa adicional de segurança, precisamos verificar seu rosto."
+        />
+      )}
     </div>
   )
 }

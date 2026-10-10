@@ -28,25 +28,15 @@ interface CompanyInfo {
   email: string
 }
 
-export default function DashboardShell({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [company, setCompany] = useState<CompanyInfo | null>(null)
+interface SidebarProps {
+  pathname: string
+  company: CompanyInfo | null
+  onNavigate: (href: string) => void
+  onLogout: () => void
+}
 
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setCompany({ name: d.company.name, plan: d.company.plan, email: d.company.email }))
-      .catch(() => router.replace('/login'))
-  }, [router])
-
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.replace('/login')
-  }
-
-  const Sidebar = () => (
+function Sidebar({ pathname, company, onNavigate, onLogout }: SidebarProps) {
+  return (
     <div
       className="flex h-full flex-col"
       style={{ background: 'var(--surface-muted)', borderRight: '1px solid var(--border)' }}
@@ -79,10 +69,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             return (
               <button
                 key={item.href}
-                onClick={() => {
-                  router.push(item.href)
-                  setMobileOpen(false)
-                }}
+                onClick={() => onNavigate(item.href)}
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors text-left"
                 style={{
                   background: active ? 'var(--accent-dim)' : 'transparent',
@@ -120,7 +107,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
         )}
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
           style={{ color: 'var(--muted)' }}
           onMouseEnter={(e) => {
@@ -138,13 +125,44 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       </div>
     </div>
   )
+}
+
+export default function DashboardShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [company, setCompany] = useState<CompanyInfo | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { company: CompanyInfo }) =>
+        setCompany({ name: d.company.name, plan: d.company.plan, email: d.company.email }),
+      )
+      .catch(() => router.replace('/login'))
+  }, [router])
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.replace('/login')
+  }
+
+  function handleNavigate(href: string) {
+    router.push(href)
+    setMobileOpen(false)
+  }
 
   return (
     <div className="flex min-h-dvh" style={{ background: 'var(--bg)', color: 'var(--ink)' }}>
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 lg:block">
         <div className="sticky top-0 h-dvh">
-          <Sidebar />
+          <Sidebar
+            pathname={pathname}
+            company={company}
+            onNavigate={handleNavigate}
+            onLogout={handleLogout}
+          />
         </div>
       </aside>
 
@@ -153,7 +171,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
           <aside className="relative z-10 w-64">
-            <Sidebar />
+            <Sidebar
+              pathname={pathname}
+              company={company}
+              onNavigate={handleNavigate}
+              onLogout={handleLogout}
+            />
           </aside>
         </div>
       )}

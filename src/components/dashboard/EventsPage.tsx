@@ -26,19 +26,29 @@ export default function EventsPage() {
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [reqId, setReqId] = useState(0)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const limit = 20
 
   useEffect(() => {
-    setLoading(true)
+    const controller = new AbortController()
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (filter) params.set('severity', filter)
-    fetch(`/api/dashboard/events?${params}`)
+    fetch(`/api/dashboard/events?${params}`, { signal: controller.signal })
       .then((r) => r.json())
-      .then((d) => { setEvents(d.events ?? []); setTotal(d.total ?? 0) })
-      .finally(() => setLoading(false))
-  }, [page, filter])
+      .then((d: { events?: AuditEvent[]; total?: number }) => {
+        setEvents(d.events ?? [])
+        setTotal(d.total ?? 0)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+    return () => controller.abort()
+  }, [page, filter, reqId])
+
+  // refresh trigger — called externally when needed
+  const triggerReload = () => setReqId((n) => n + 1)
+  void triggerReload
 
   const filters = [
     { value: '', label: 'Todos' },
