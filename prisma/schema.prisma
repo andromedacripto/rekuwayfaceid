@@ -1,0 +1,230 @@
+// Rekuway Face ID — Prisma Schema
+// PostgreSQL production-grade
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Companies (SaaS Tenants) ──────────────────────────────────────────────
+model Company {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  plan         Plan     @default(FREE)
+  status       CompanyStatus @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users         User[]
+  apiKeys       ApiKey[]
+  verifications Verification[]
+  events        AuditEvent[]
+  webhooks      Webhook[]
+  usageLimits   UsageLimit?
+
+  @@index([email])
+  @@map("companies")
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+// ─── Users (company staff) ────────────────────────────────────────────────
+model User {
+  id           String     @id @default(cuid())
+  companyId    String
+  email        String
+  passwordHash String
+  name         String
+  role         UserRole   @default(VIEWER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  lastLoginAt  DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
+  @@index([companyId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+// ─── API Keys ─────────────────────────────────────────────────────────────
+model ApiKey {
+  id          String      @id @default(cuid())
+  companyId   String
+  name        String
+  keyPrefix   String      // e.g. "rfid_live_" — displayed
+  keyHash     String      @unique // bcrypt hash — never stored plain
+  environment Environment @default(SANDBOX)
+  status      ApiKeyStatus @default(ACTIVE)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime    @default(now())
+  revokedAt   DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([keyPrefix])
+  @@map("api_keys")
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum Environment {
+  SANDBOX
+  PRODUCTION
+}
+
+// ─── Verifications ─────────────────────────────────────────────────────────
+model Verification {
+  id            String             @id @default(cuid())
+  companyId     String
+  externalRef   String?            // client's own user/session id
+  status        VerificationStatus @default(PENDING)
+  riskLevel     RiskLevel          @default(UNKNOWN)
+  riskScore     Float?
+  livenessPass  Boolean?
+  matchScore    Float?
+  refusalReason String?
+  providerRef   String?            // provider's own job id
+  providerData  Json?              // raw provider response (sanitized)
+  ipAddress     String?
+  userAgent     String?
+  deviceFingerprint String?
+  requestedAt   DateTime           @default(now())
+  completedAt   DateTime?
+  expiresAt     DateTime
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  events  AuditEvent[]
+
+  @@index([companyId, status])
+  @@index([externalRef])
+  @@map("verifications")
+}
+
+enum VerificationStatus {
+  PENDING
+  PROCESSING
+  VERIFIED
+  REFUSED
+  INCONCLUSIVE
+  EXPIRED
+  REQUIRES_REVIEW
+}
+
+enum RiskLevel {
+  UNKNOWN
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ─── Audit Events ──────────────────────────────────────────────────────────
+model AuditEvent {
+  id             String    @id @default(cuid())
+  companyId      String
+  verificationId String?
+  eventType      String    // e.g. "LIVENESS_FAIL", "REPEATED_ATTEMPT", "ACCOUNT_TAKEOVER_SIGNAL"
+  severity       EventSeverity @default(INFO)
+  summary        String
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime  @default(now())
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  verification Verification? @relation(fields: [verificationId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([verificationId])
+  @@map("audit_events")
+}
+
+enum EventSeverity {
+  INFO
+  ALERT
+  SUSPICIOUS
+  CONFIRMED_FRAUD
+}
+
+// ─── Webhooks ──────────────────────────────────────────────────────────────
+model Webhook {
+  id          String        @id @default(cuid())
+  companyId   String
+  url         String
+  secret      String        // HMAC signing secret — stored hashed
+  events      String[]      // event types to deliver
+  status      WebhookStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
+
+  @@index([companyId])
+  @@map("webhooks")
+}
+
+enum WebhookStatus {
+  ACTIVE
+  PAUSED
+  FAILED
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  webhookId   String
+  eventType   String
+  payload     Json
+  statusCode  Int?
+  attempt     Int      @default(1)
+  success     Boolean  @default(false)
+  error       String?
+  deliveredAt DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@map("webhook_deliveries")
+}
+
+// ─── Usage Limits ──────────────────────────────────────────────────────────
+model UsageLimit {
+  id                    String   @id @default(cuid())
+  companyId             String   @unique
+  monthlyVerifications  Int      @default(100)
+  usedThisMonth         Int      @default(0)
+  resetAt               DateTime
+  updatedAt             DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("usage_limits")
+}
