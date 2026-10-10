@@ -16,12 +16,15 @@ RUN npm install -g bun@1.2
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
-RUN bunx prisma generate
+# Generate Prisma client (needs a valid-format URL, actual connection not needed at build)
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
+RUN node_modules/.bin/prisma generate
 
-# Build Next.js (standalone output)
+# Build Next.js standalone
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# DATABASE_URL is only needed at runtime — skip DB calls during build
+ENV SKIP_ENV_VALIDATION=1
 RUN bun run build
 
 # ─── Stage 3: runner ─────────────────────────────────────────────────────────
@@ -34,12 +37,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy standalone build
+# Copy standalone build output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma schema + generated client for migrations
+# Copy Prisma schema + generated client for runtime migrations
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma

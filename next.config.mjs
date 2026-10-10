@@ -6,6 +6,8 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
   },
+  // Prevent Prisma / Node-only modules from being bundled into client chunks
+  serverExternalPackages: ['@prisma/client', '.prisma/client', 'bcryptjs'],
   async headers() {
     return [
       {
